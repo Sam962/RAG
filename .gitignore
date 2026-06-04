@@ -1,0 +1,17 @@
+# Secrets
+.env
+
+# Python / virtualenv
+.venv/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Generated vector stores / binary artifacts
+faiss_store/
+data/vector_store/
+
+# Personal data (remove this line if you WANT the resume public)
+data/pdf/Sam_aldehayyat_resume.pdf
