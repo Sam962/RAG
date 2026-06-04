@@ -13,8 +13,8 @@ class RAGSearch:
         faiss_path = os.path.join(persist_dir, 'faiss.index')
         meta_path = os.path.join(persist_dir, 'metadata.pk1')
         if not (os.path.exists(faiss_path) and os.path.exists(meta_path)):
-            from data_loader import load_all_documwnts
-            docs = load_all_documwnts('data')
+            from src.data_loader import load_all_docs
+            docs = load_all_docs('data')
             self.vectorstore.build_from_documents(docs)
 
         else:

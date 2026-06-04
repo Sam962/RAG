@@ -1,3 +1,5 @@
+import os
+
 from src.data_loader import load_all_docs
 from src.vector_store import FiassVectorStore
 from src.search import RAGSearch
@@ -7,14 +9,17 @@ from src.search import RAGSearch
 
 ## return doc 
 if __name__ == "__main__":
-    # Its already initiated uncommented for the first time.
-
-    docs    = load_all_docs("data")
     store = FiassVectorStore("faiss_store")
-    store.build_from_documents(docs)  # undo it to build faiss 
 
-    # if it already built then 
-    store.load()
+    # Build the index from documents only the first time, then reuse it.
+    faiss_path = os.path.join("faiss_store", "faiss.index")
+    meta_path = os.path.join("faiss_store", "metadata.pk1")
+    if os.path.exists(faiss_path) and os.path.exists(meta_path):
+        store.load()
+    else:
+        docs = load_all_docs("data")
+        store.build_from_documents(docs)
+
     print(store.query("What is beam search, and how does it differ from greedy decoding?", top_k =3))
 
     rag_search = RAGSearch()
