@@ -1,18 +1,20 @@
 # RAG
 
-A Retrieval-Augmented Generation (RAG) pipeline in Python: load your own documents, embed them, store the vectors in FAISS, and answer questions with a Groq-hosted LLM.
+A Retrieval-Augmented Generation (RAG) pipeline in Python: load your own documents, embed them, store the vectors in FAISS, retrieve with hybrid search, and answer questions with a Groq-hosted LLM.
 
 ## Features
 
 - Load PDF, text, and CSV files from a `data/` folder (via LangChain loaders)
 - Chunk documents with `RecursiveCharacterTextSplitter`
 - Generate embeddings with `sentence-transformers` (`all-MiniLM-L6-v2`)
-- Store and search vectors with FAISS
+- Store and search vectors with FAISS (cosine / inner product)
+- Hybrid retrieval: dense FAISS + BM25, fused with RRF, then cross-encoder rerank
+- Optional LangSmith tracing
 - Summarize retrieved context with a Groq LLM (`llama-3.3-70b-versatile`)
 
 ## Tech stack
 
-LangChain - sentence-transformers - FAISS - ChromaDB - Groq - python-dotenv
+LangChain - LangGraph - LangSmith - sentence-transformers - FAISS - BM25 - Groq - pydantic-settings
 
 ## Project structure
 
@@ -20,10 +22,13 @@ LangChain - sentence-transformers - FAISS - ChromaDB - Groq - python-dotenv
 RAG_PRO/
 ├── app.py                 # Entry point: build store, query, summarize
 ├── src/
+│   ├── config.py          # Settings from .env (models, keys, chunking)
 │   ├── data_loader.py     # Load PDF/TXT/CSV into LangChain documents
 │   ├── embedding.py       # Chunk documents and create embeddings
 │   ├── vector_store.py    # FAISS index: build, save, load, query
-│   └── search.py          # RAGSearch: retrieve context + Groq LLM
+│   ├── retriever.py       # Hybrid retrieve + rerank
+│   ├── search.py          # RAGSearch: retrieve context + Groq LLM
+│   └── graph.py           # LangGraph scaffolding (in progress)
 ├── data/                  # Your source documents (PDF/TXT/CSV)
 ├── notebook/              # Exploratory notebooks
 ├── requirements.txt
@@ -37,8 +42,8 @@ flowchart LR
     docs[Documents in data/] --> loader[data_loader.py]
     loader --> chunker[embedding.py: chunk + embed]
     chunker --> store[vector_store.py: FAISS index]
-    query[User query] --> store
-    store --> retrieve[Top-k relevant chunks]
+    query[User query] --> retrieve[retriever.py: hybrid + rerank]
+    store --> retrieve
     retrieve --> llm[search.py: Groq LLM]
     llm --> answer[Answer / summary]
 ```
@@ -68,6 +73,16 @@ Then edit `.env`:
 ```
 GROQ_API_KEY=your_key_here
 ```
+
+Optional LangSmith tracing:
+
+```
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your_langsmith_key
+LANGSMITH_PROJECT=rag-pro
+```
+
+`src/config.py` requires a real `GROQ_API_KEY` (not the placeholder) before the app will start.
 
 ## Usage
 

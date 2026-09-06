@@ -4,6 +4,7 @@ Here is what vector store will be used
 
 import os
 import faiss
+from langsmith import traceable
 import numpy as np
 import pickle
 from typing import List, Any
@@ -28,15 +29,24 @@ class FiassVectorStore:
         emb_pipe = EmbeddingPipeline(model_name=self.embedding_model, chunk_size =self.chunk_size, chunk_overlap=self.chunk_overlap)
         chunks = emb_pipe.chunk_documents(documents)
         embeddings = emb_pipe.emb_chunks(chunks)
-        metadatas = [{"text": chunk.page_content} for chunk in chunks]
+        metadatas = []
+        for i , chunk in enumerate(chunks):
+            metadatas.append({
+                "text": chunk.page_content,
+                "source": chunk.metadata.get('source', 'Unknown'),
+                "page": chunk.metadata.get("page", None),
+                "chunk_id": i
+            })
         self.add_embeddings(np.array(embeddings).astype('float32'), metadatas)
         self.save()
         print(f"[INFO] Vector store built and saved to {self.persist_dir}")
 
     def add_embeddings(self, embeddings: np.array, metadatas: List[Any] = None):
+        embeddings= np.array(embeddings.astype('float32'))
+        faiss.normalize_L2(embeddings)
         dim = embeddings.shape[1]
         if self.index is None:
-            self.index = faiss.IndexFlatL2(dim)
+            self.index = faiss.IndexFlatIP(dim)
         self.index.add(embeddings)
         if metadatas: 
             self.metadata.extend(metadatas)
@@ -65,10 +75,12 @@ class FiassVectorStore:
             meta = self.metadata[idx] if idx < len(self.metadata) else None
             results.append({'index': idx , 'distance': dist , 'metadata': meta})
         return results
-
+    @traceable(run_type='retriever', name = 'fiass_query')
     def query(self, query_text: str, top_k: int = 5):
         print(f"[INFO] Quering vector store for '{query_text}")
+
         query_emb = self.model.encode([query_text]).astype('float32')
+        faiss.normalize_L2(query_emb)
         return self.search(query_emb, top_k=top_k)
 
 

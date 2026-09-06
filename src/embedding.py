@@ -3,6 +3,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer 
 import numpy as np
 from src.data_loader import load_all_docs
+from langsmith import traceable
 
 
 class EmbeddingPipeline:
@@ -25,7 +26,7 @@ class EmbeddingPipeline:
         chunks = splitter.split_documents(documents)
         print(f"[INFO] split {len(documents)} documents into {len(chunks)} chunks")
         return chunks
-
+    @traceable(run_type='embedding', name = 'emb_chunk')
     # embed chunks pass through the model to convert it into Vector Embeddings
     def emb_chunks(self, chunks: List[Any]) -> np.ndarray:
         texts = [chunk.page_content for chunk in chunks]

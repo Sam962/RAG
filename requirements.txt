@@ -8,3 +8,12 @@ faiss-cpu
 chromadb
 langchain-groq
 python_dotenv
+langgraph
+langsmith
+rank-bm25
+fastapi
+uvicorn[standard]
+streamlit
+pydantic-settings
+ragas
+pytest
