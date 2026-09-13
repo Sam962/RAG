@@ -47,7 +47,9 @@ class FiassVectorStore:
                 "text": chunk.page_content,
                 "source": chunk.metadata.get('source', 'Unknown'),
                 "page": chunk.metadata.get("page", None),
-                "chunk_id": i
+                "chunk_id": i,
+                "doc_id": chunk.metadata.get("doc_id"),
+                "section_id": chunk.metadata.get("section_id"),
             })
         self.add_embeddings(np.array(embeddings).astype('float32'), metadatas)
         self.save()

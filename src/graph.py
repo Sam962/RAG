@@ -44,6 +44,7 @@ class GraphState(TypedDict, total=False):
 _vectorstore = None
 _retriever = None
 _llm = None
+_active_persist_dir: str | None = None
 
 
 def load_rag_components():
@@ -53,7 +54,7 @@ def load_rag_components():
         return _vectorstore, _retriever, _llm
 
     configure_langsmith()
-    persist_dir = settings.persist_dir
+    persist_dir = _active_persist_dir or settings.persist_dir
     embedding_model = settings.embedding_model
 
     vectorstore = FiassVectorStore(
@@ -67,11 +68,16 @@ def load_rag_components():
 
     if os.path.exists(faiss_path) and os.path.exists(meta_path):
         vectorstore.load()
-    else:
+    elif persist_dir == settings.persist_dir:
         from src.data_loader import load_all_docs
 
         docs = load_all_docs("data")
         vectorstore.build_from_documents(docs)
+    else:
+        raise FileNotFoundError(
+            f"FAISS store not found in {persist_dir}. "
+            "Build the eval index before invoking the graph."
+        )
 
     retriever = HybridRetriever(vectorstore)
     llm = build_chat_model()
@@ -193,7 +199,11 @@ def fallback(state: GraphState) -> GraphState:
     }
 
 
-def build_graph(checkpointer=None):
+def build_graph(checkpointer=None, persist_dir: str | None = None):
+    global _active_persist_dir
+    if persist_dir != _active_persist_dir:
+        reset_rag_components()
+    _active_persist_dir = persist_dir
     graph = StateGraph(GraphState)
     graph.add_node("rewrite_query", rewrite_query)
     graph.add_node("hybrid_retrieve", hybrid_retrieve)

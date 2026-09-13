@@ -32,7 +32,7 @@ RAG_PRO/
 │   ├── llm.py             # Provider factory + Groq→Ollama fallback
 │   ├── search.py          # RAGSearch: retrieve context + LLM
 │   └── graph.py           # LangGraph: rewrite → retrieve → rerank → grade → generate
-├── eval/                  # In-repo Q/A set + ragas runner (RAG-8)
+├── eval/                  # Own-docs Q/A + Open RAG Bench track + ragas runner
 ├── data/                  # Your source documents (PDF/TXT/CSV)
 ├── notebook/              # Exploratory notebooks
 ├── requirements.txt
@@ -150,6 +150,42 @@ uv run python eval/run_eval.py
 Needs a Groq key when `LLM_PROVIDER=groq`, plus a running Ollama daemon if fallback is Ollama. Ragas answer relevancy uses `strictness=1` (Groq only allows `n=1`). Unknown questions are scored by abstain rate, not ragas. With `LANGSMITH_TRACING=true` the runner upserts dataset `rag-pro-own-docs`. Scores write to `eval/last_results.json` (gitignored).
 
 `uv run python eval/run_eval.py --limit 3 --no-score` runs the graph only. Sleep between examples defaults to 0 when the primary provider is Ollama, else 8s (Groq TPM).
+
+### Evaluation (Open RAG Bench)
+
+Second track is a **text-only extractive** slice of [vectara/open_ragbench](https://huggingface.co/datasets/vectara/open_ragbench) (CC-BY-NC-4.0, research/personal). It does **not** replace `data/`. Gold paper sections are indexed into `eval/.cache/open_ragbench/store/` (gitignored). Retrieval is scored with official `qrels` (`doc_id` + `section_id`); generation can still use ragas.
+
+```bash
+uv run python eval/run_eval.py --track open-ragbench --limit 30 --no-score
+uv run python eval/run_eval.py --track open-ragbench --limit 30
+```
+
+Default slice size is 30. The store includes official **hard-negative** papers (never a gold doc) so recall is not measured in a gold-only haystack. `--no-hard-negatives` indexes gold papers only. `--rebuild-index` forces a rebuild; a store that is missing gold or hard-negative IDs is rebuilt automatically. Skip image/table queries until ingest is multimodal. Prefer `--no-score` or an Ollama judge so Groq TPM is not spent on ragas.
+
+### Latest scores
+
+Local runs (Sep 2026). Re-run the commands above to refresh `eval/last_results.json` and `eval/last_open_ragbench.json` (both gitignored).
+
+**Own docs** — 18 questions (12 fact, 3 follow-up, 3 should-unknown):
+
+| Metric | Score |
+| --- | --- |
+| Unknown abstain | 1.00 (3/3) |
+| Token overlap vs gold | 0.82 |
+| Mean citations | 2.2 |
+| Faithfulness / context precision / context recall (ragas) | 1.00* |
+| Answer relevancy (ragas) | 0.84* |
+
+\*Ragas judges shared Groq’s 8k TPM with generation; treat the 1.00s as directional.
+
+**Open RAG Bench** — 30 text-only extractive queries, official qrels:
+
+| Index | Papers / chunks | Doc recall | Section recall | Token overlap |
+| --- | --- | --- | --- | --- |
+| Gold papers only | 28 / 8.7k | 1.00 | 0.97 (29/30) | 0.85 |
+| Gold + hard negatives | 629 / 156k | 1.00 | 0.97 (29/30) | 0.85 |
+
+One section miss (NVILA) was the gold paper, neighboring section. Adding 604 hard-negative papers did not change recall. Not measured: abstractive, table, or image queries.
 
 ## Notes
 

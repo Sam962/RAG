@@ -19,3 +19,4 @@ pydantic-settings
 ragas
 pytest
 python-pptx
+huggingface-hub

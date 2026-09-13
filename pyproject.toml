@@ -29,6 +29,7 @@ dependencies = [
     "ragas>=0.2.0",
     "pytest>=8.0.0",
     "python-pptx>=1.0.0",
+    "huggingface-hub>=0.20.0",
 ]
 
 [tool.pytest.ini_options]

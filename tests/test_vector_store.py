@@ -49,6 +49,24 @@ def test_search_empty_index_returns_empty_list(store):
     assert store.search(query, top_k=5) == []
 
 
+def test_build_from_documents_keeps_qrel_metadata(store):
+    chunk = MagicMock()
+    chunk.page_content = "LoRA adapters"
+    chunk.metadata = {
+        "source": "paper-a",
+        "doc_id": "paper-a",
+        "section_id": 4,
+        "page": 4,
+    }
+    pipe = MagicMock()
+    pipe.chunk_documents.return_value = [chunk]
+    pipe.emb_chunks.return_value = np.array([[1.0, 0.0, 0.0, 0.0]], dtype="float32")
+    with patch("src.vector_store.EmbeddingPipeline", return_value=pipe):
+        store.build_from_documents([MagicMock()])
+    assert store.metadata[0]["doc_id"] == "paper-a"
+    assert store.metadata[0]["section_id"] == 4
+
+
 def test_build_from_documents_rejects_empty_list(store):
     with pytest.raises(ValueError, match="No documents to index"):
         store.build_from_documents([])

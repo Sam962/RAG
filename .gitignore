@@ -18,6 +18,8 @@ __pycache__/
 # Generated vector stores / binary artifacts
 faiss_store/
 eval/last_results.json
+eval/last_open_ragbench.json
+eval/.cache/
 data/vector_store/
 
 # Personal data (remove this line if you WANT the resume public)

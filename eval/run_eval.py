@@ -17,13 +17,21 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from eval.dataset import contexts_from_result, load_examples
+from eval.open_ragbench import (
+    DEFAULT_LIMIT as ORB_DEFAULT_LIMIT,
+    STORE_DIR as ORB_STORE_DIR,
+    prepare_track,
+    retrieval_hits,
+)
 from eval.ragas_compat import patch_langchain_vertexai
 from src.config import configure_langsmith, settings
 from src.llm import build_chat_model, llm_provider
 from src.graph import build_graph
 from src.search import _NO_CONTEXT_ANSWER
 
-LANGSMITH_DATASET = "rag-pro-own-docs"
+LANGSMITH_OWN = "rag-pro-own-docs"
+LANGSMITH_ORB = "rag-pro-open-ragbench"
+LANGSMITH_DATASET = LANGSMITH_OWN
 METRIC_NAMES = (
     "faithfulness",
     "answer_relevancy",
@@ -56,6 +64,11 @@ def run_graph_examples(
             unknown_ok = _NO_CONTEXT_ANSWER in answer or answer.strip().startswith(
                 "I don't know"
             )
+        hits = (
+            retrieval_hits(result.get("documents") or [], example["qrel"])
+            if example.get("qrel")
+            else None
+        )
         rows.append(
             {
                 "id": example["id"],
@@ -67,6 +80,8 @@ def run_graph_examples(
                 "citation_count": len(result.get("citations") or []),
                 "unknown_ok": unknown_ok,
                 "token_recall": token_recall(answer, example["ground_truth"]),
+                "doc_hit": None if hits is None else hits["doc_hit"],
+                "section_hit": None if hits is None else hits["section_hit"],
             }
         )
     return rows
@@ -95,7 +110,10 @@ def _finite_mean(values: list[Any]) -> float | None:
     return sum(nums) / len(nums)
 
 
-def score_with_ragas(rows: list[dict[str, Any]]) -> dict[str, float]:
+def score_with_ragas(
+    rows: list[dict[str, Any]],
+    experiment_name: str | None = None,
+) -> dict[str, float]:
     patch_langchain_vertexai()
     from langchain_core.embeddings import Embeddings
     from ragas import evaluate
@@ -146,7 +164,7 @@ def score_with_ragas(rows: list[dict[str, Any]]) -> dict[str, float]:
         ],
         llm=wrapped_llm,
         embeddings=wrapped_emb,
-        experiment_name=LANGSMITH_DATASET,
+        experiment_name=experiment_name or LANGSMITH_DATASET,
         raise_exceptions=False,
         batch_size=1,
         run_config=RunConfig(timeout=180, max_workers=1, max_retries=3),
@@ -163,7 +181,8 @@ def summarize(rows: list[dict[str, Any]], metrics: dict[str, float] | None) -> d
     unknown = [row for row in rows if row["kind"] == "unknown"]
     unknown_ok = [row for row in unknown if row.get("unknown_ok")]
     grounded = [row for row in rows if row["kind"] != "unknown"]
-    return {
+    qrel_rows = [row for row in rows if row.get("doc_hit") is not None]
+    summary = {
         "n": len(rows),
         "by_kind": {
             kind: sum(1 for row in rows if row["kind"] == kind)
@@ -178,6 +197,17 @@ def summarize(rows: list[dict[str, Any]], metrics: dict[str, float] | None) -> d
             "unknown_abstain_rate. token_recall is lexical overlap with the gold answer."
         ),
     }
+    if qrel_rows:
+        summary["doc_recall"] = sum(1 for row in qrel_rows if row["doc_hit"]) / len(
+            qrel_rows
+        )
+        summary["section_recall"] = sum(
+            1 for row in qrel_rows if row["section_hit"]
+        ) / len(qrel_rows)
+        summary["note"] += (
+            " Open RAG Bench also reports doc_recall / section_recall from official qrels."
+        )
+    return summary
 
 
 def sync_langsmith_dataset(examples: list[dict[str, Any]]) -> str | None:
@@ -188,9 +218,14 @@ def sync_langsmith_dataset(examples: list[dict[str, Any]]) -> str | None:
 
     client = Client()
     if not client.has_dataset(dataset_name=LANGSMITH_DATASET):
+        description = (
+            "Open RAG Bench text-only extractive slice (not data/)."
+            if LANGSMITH_DATASET == LANGSMITH_ORB
+            else "In-repo Q/A from data/ (not Open RAG Bench)."
+        )
         client.create_dataset(
             dataset_name=LANGSMITH_DATASET,
-            description="In-repo Q/A from data/ (not Open RAG Bench).",
+            description=description,
         )
     existing = {
         example.inputs.get("id")
@@ -215,12 +250,29 @@ def sync_langsmith_dataset(examples: list[dict[str, Any]]) -> str | None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate RAG Pro on the in-repo Q/A set.")
     parser.add_argument(
+        "--track",
+        choices=("own", "open-ragbench"),
+        default="own",
+        help="own = eval/dataset.json. open-ragbench = text-only extractive slice.",
+    )
+    parser.add_argument(
         "--dataset",
         type=Path,
         default=None,
-        help="Path to dataset JSON (default: eval/dataset.json).",
+        help="Path to dataset JSON (own track only; default: eval/dataset.json).",
     )
     parser.add_argument("--limit", type=int, default=0, help="Score only the first N examples.")
+    parser.add_argument(
+        "--rebuild-index",
+        action="store_true",
+        help="Rebuild the Open RAG Bench store from gold sections.",
+    )
+    parser.add_argument(
+        "--hard-negatives",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Index official hard-negative papers (default). Use --no-hard-negatives for gold-only.",
+    )
     parser.add_argument(
         "--no-score",
         action="store_true",
@@ -234,7 +286,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--out",
         type=Path,
-        default=_ROOT / "eval" / "last_results.json",
+        default=None,
         help="Write the score report JSON here.",
     )
     parser.add_argument(
@@ -247,10 +299,40 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    global LANGSMITH_DATASET
     args = parse_args(argv)
-    examples = load_examples(args.dataset)
-    if args.limit and args.limit > 0:
-        examples = examples[: args.limit]
+    persist_dir = None
+    extra_summary: dict[str, Any] = {}
+    if args.track == "open-ragbench":
+        LANGSMITH_DATASET = LANGSMITH_ORB
+        limit = args.limit if args.limit and args.limit > 0 else ORB_DEFAULT_LIMIT
+        examples, track_info = prepare_track(
+            limit=limit,
+            rebuild=args.rebuild_index,
+            include_hard_negatives=args.hard_negatives,
+        )
+        persist_dir = str(ORB_STORE_DIR)
+        extra_summary = {
+            "track": "open-ragbench",
+            "slice": track_info["slice"],
+            "license": track_info["license"],
+            "gold_docs": track_info["gold_docs"],
+            "n_hard_negatives": track_info.get("n_hard_negatives", 0),
+            "index": track_info["index"],
+        }
+        print(
+            f"[INFO] Open RAG Bench slice {track_info['slice']}: "
+            f"{len(examples)} queries, {len(track_info['gold_docs'])} gold papers, "
+            f"{track_info.get('n_hard_negatives', 0)} hard negatives. "
+            "Does not touch data/."
+        )
+        args.out = args.out or (_ROOT / "eval" / "last_open_ragbench.json")
+    else:
+        LANGSMITH_DATASET = LANGSMITH_OWN
+        examples = load_examples(args.dataset)
+        if args.limit and args.limit > 0:
+            examples = examples[: args.limit]
+        args.out = args.out or (_ROOT / "eval" / "last_results.json")
 
     configure_langsmith()
     if not args.no_langsmith:
@@ -264,10 +346,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.sleep is None:
         args.sleep = 0.0 if llm_provider() == "ollama" else 8.0
     print(f"[INFO] Running graph on {len(examples)} examples (sleep {args.sleep}s)…")
-    rows = run_graph_examples(examples, sleep_s=args.sleep)
-    metrics = None if args.no_score else score_with_ragas(rows)
+    graph = build_graph(persist_dir=persist_dir) if persist_dir else None
+    rows = run_graph_examples(examples, graph=graph, sleep_s=args.sleep)
+    metrics = (
+        None
+        if args.no_score
+        else score_with_ragas(rows, experiment_name=LANGSMITH_DATASET)
+    )
     report = {
-        "summary": summarize(rows, metrics),
+        "summary": {**summarize(rows, metrics), **extra_summary},
         "examples": [
             {
                 "id": row["id"],
@@ -277,6 +364,8 @@ def main(argv: list[str] | None = None) -> int:
                 "citation_count": row["citation_count"],
                 "token_recall": row.get("token_recall"),
                 "unknown_ok": row["unknown_ok"],
+                "doc_hit": row.get("doc_hit"),
+                "section_hit": row.get("section_hit"),
             }
             for row in rows
         ],
