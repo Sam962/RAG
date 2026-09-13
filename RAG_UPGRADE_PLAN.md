@@ -161,6 +161,8 @@ an answer with citations, and follow-up questions use history.
 
 **Done when:** you get metric scores per run and can compare before/after changes.
 
+**Later (parked):** [vectara/open_ragbench](https://huggingface.co/datasets/vectara/open_ragbench) as a second eval track after the in-repo Q/A set. Use a small text-only slice + gold PDFs only; do not swap the working `data/` corpus. CC-BY-NC-4.0.
+
 ---
 
 ## 8. Wire-up + docs

@@ -265,6 +265,12 @@ Measure quality and enable before/after comparisons.
 - Results are visible in LangSmith and reproducible across runs.
 - Changing retrieval params produces a comparable score delta.
 
+**Later (parked):** [vectara/open_ragbench](https://huggingface.co/datasets/vectara/open_ragbench)
+- Do **not** replace `data/` with this corpus. First RAG-8 run uses 10–20 Q/A pairs from our own docs.
+- Second eval track: slice of **text-only / extractive** queries (skip image/table until we have multimodal ingest).
+- Ingest only the gold PDFs for that slice; score retrieval via `qrels` (`doc_id` + `section_id`) and generation with ragas; log to LangSmith.
+- License: CC-BY-NC-4.0 (research/personal; not for commercial use without another license).
+
 ---
 
 ## RAG-9 — Wire-up & documentation

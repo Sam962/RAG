@@ -1,0 +1,137 @@
+[
+  {
+    "id": "py-creator",
+    "kind": "fact",
+    "question": "Who created Python?",
+    "ground_truth": "Guido van Rossum created Python.",
+    "chat_history": []
+  },
+  {
+    "id": "py-year",
+    "kind": "fact",
+    "question": "When was Python first released?",
+    "ground_truth": "Python was first released in 1991.",
+    "chat_history": []
+  },
+  {
+    "id": "py-type",
+    "kind": "fact",
+    "question": "What kind of programming language is Python?",
+    "ground_truth": "Python is a high-level, interpreted programming language known for its simplicity and readability.",
+    "chat_history": []
+  },
+  {
+    "id": "ml-def",
+    "kind": "fact",
+    "question": "What is machine learning?",
+    "ground_truth": "Machine learning is a subset of artificial intelligence that enables systems to learn and improve from experience without being explicitly programmed.",
+    "chat_history": []
+  },
+  {
+    "id": "ml-types",
+    "kind": "fact",
+    "question": "What are the three types of machine learning?",
+    "ground_truth": "Supervised learning (labeled data), unsupervised learning (patterns in unlabeled data), and reinforcement learning (rewards and penalties).",
+    "chat_history": []
+  },
+  {
+    "id": "ml-apps",
+    "kind": "fact",
+    "question": "What are some applications of machine learning?",
+    "ground_truth": "Applications include image recognition, speech processing, and recommendation systems.",
+    "chat_history": []
+  },
+  {
+    "id": "llm-token",
+    "kind": "fact",
+    "question": "What is tokenization in LLMs?",
+    "ground_truth": "Tokenization is the process of splitting text into smaller units called tokens, which can be words, subwords, or characters.",
+    "chat_history": []
+  },
+  {
+    "id": "llm-beam",
+    "kind": "fact",
+    "question": "What is beam search?",
+    "ground_truth": "Beam search is a search algorithm used during text generation to find the most likely sequence of words. Unlike greedy decoding, it keeps multiple candidate sequences at each step.",
+    "chat_history": []
+  },
+  {
+    "id": "llm-temp",
+    "kind": "fact",
+    "question": "What does temperature control in LLM text generation?",
+    "ground_truth": "Temperature is a hyperparameter that controls the randomness of text generation by adjusting the probability distribution over possible next tokens. A low temperature is more deterministic; a higher temperature is more random.",
+    "chat_history": []
+  },
+  {
+    "id": "llm-lora",
+    "kind": "fact",
+    "question": "What is LoRA?",
+    "ground_truth": "LoRA (Low-Rank Adaptation) is a technique for fine-tuning large language models that reduces memory usage and improves efficiency without compromising performance.",
+    "chat_history": []
+  },
+  {
+    "id": "resume-volanno",
+    "kind": "fact",
+    "question": "What is Sam Aldehayyat's current role at Volanno?",
+    "ground_truth": "AI / Full-Stack Engineer at Volanno in Charlotte, NC, from August 2025 to present.",
+    "chat_history": []
+  },
+  {
+    "id": "resume-cyborg",
+    "kind": "fact",
+    "question": "Where did Sam Aldehayyat work as an AI Developer?",
+    "ground_truth": "Cyborg Automation Hub in Charlotte.",
+    "chat_history": []
+  },
+  {
+    "id": "fu-python-year",
+    "kind": "followup",
+    "question": "when was it first released?",
+    "ground_truth": "Python was first released in 1991.",
+    "chat_history": [
+      {"role": "user", "content": "Who created Python?"},
+      {"role": "assistant", "content": "Guido van Rossum created Python."}
+    ]
+  },
+  {
+    "id": "fu-beam-greedy",
+    "kind": "followup",
+    "question": "how does it differ from greedy decoding?",
+    "ground_truth": "Greedy decoding picks the single highest-probability word at each step. Beam search keeps multiple high-probability sequences instead of choosing only one path.",
+    "chat_history": [
+      {"role": "user", "content": "What is beam search?"},
+      {"role": "assistant", "content": "Beam search keeps multiple candidate sequences while generating text."}
+    ]
+  },
+  {
+    "id": "fu-years",
+    "kind": "followup",
+    "question": "how many years of experience he has?",
+    "ground_truth": "Work history includes Cellular Tech from January 2022 to February 2024, Cyborg from February 2025 to August 2025, and Volanno from August 2025 to present. Together that is about 3.5 to 4 years depending on the current date.",
+    "chat_history": [
+      {"role": "user", "content": "Who is Sam Aldehayyat?"},
+      {"role": "assistant", "content": "Sam Aldehayyat is an AI developer who has worked at Volanno, Cyborg Automation Hub, and Cellular Tech."}
+    ]
+  },
+  {
+    "id": "unk-mars",
+    "kind": "unknown",
+    "question": "What is the capital of Mars?",
+    "ground_truth": "I don't know. No relevant documents were found.",
+    "chat_history": []
+  },
+  {
+    "id": "unk-stock",
+    "kind": "unknown",
+    "question": "What was Apple's closing stock price yesterday?",
+    "ground_truth": "I don't know. No relevant documents were found.",
+    "chat_history": []
+  },
+  {
+    "id": "unk-recipe",
+    "kind": "unknown",
+    "question": "How do I make sourdough starter?",
+    "ground_truth": "I don't know. No relevant documents were found.",
+    "chat_history": []
+  }
+]
