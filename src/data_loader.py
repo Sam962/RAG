@@ -1,81 +1,96 @@
-"""
-Here will upload the data and chunk it.
-"""
-# import library will be used 
+"""Load PDF, TXT, CSV, and PPTX files into LangChain documents."""
+
 from pathlib import Path
-from typing import List, Any
-from langchain_community.document_loaders import PyPDFLoader, PyMuPDFLoader,TextLoader, CSVLoader ,Docx2txtLoader, JSONLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders.excel import UnstructuredExcelLoader
+from typing import Any, Callable, List
+
+from langchain_community.document_loaders import CSVLoader, PyPDFLoader, TextLoader
+from langchain_core.documents import Document
+from pptx import Presentation
 
 
-## read all files fun
+def _load_pdf(path: Path) -> List[Any]:
+    return PyPDFLoader(str(path)).load()
 
-def load_all_docs(data_dir:str) -> List[Any]:
+
+def _load_txt(path: Path) -> List[Any]:
+    return TextLoader(str(path), encoding="utf-8").load()
+
+
+def _load_csv(path: Path) -> List[Any]:
+    return CSVLoader(str(path)).load()
+
+
+def _load_pptx(path: Path) -> List[Document]:
+    """One document per slide: shape text plus speaker notes."""
+    presentation = Presentation(str(path))
+    docs: List[Document] = []
+    for slide_number, slide in enumerate(presentation.slides, start=1):
+        parts: List[str] = []
+        for shape in slide.shapes:
+            if shape.has_text_frame and shape.text_frame.text.strip():
+                parts.append(shape.text_frame.text.strip())
+        if slide.has_notes_slide:
+            notes = slide.notes_slide.notes_text_frame.text.strip()
+            if notes:
+                parts.append(notes)
+        content = "\n".join(parts)
+        if not content:
+            continue
+        docs.append(
+            Document(
+                page_content=content,
+                metadata={"source": str(path), "page": slide_number},
+            )
+        )
+    if not docs:
+        raise ValueError(f"No text found in PowerPoint: {path}")
+    return docs
+
+
+_LOADERS: List[tuple[str, str, Callable[[Path], List[Any]]]] = [
+    ("PDF", "*.pdf", _load_pdf),
+    ("TEXT", "*.txt", _load_txt),
+    ("CSV", "*.csv", _load_csv),
+    ("PPTX", "*.pptx", _load_pptx),
+]
+
+
+def load_all_docs(data_dir: str) -> List[Any]:
+    """Load supported files from data_dir.
+
+    Unreadable files are skipped. Raises if the directory is missing or nothing loads.
     """
-    Loaded all the supporter files from the data directory and convert it to LangChain document structure
-    supported file: CSV, PDF, EXCELL, WORD and JSON.
-    """
-    
-    # use project root data folder
     data_path = Path(data_dir).resolve()
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data directory not found: {data_path}")
+
     print(f"[DEBUG] Data path : {data_path}")
-    documents =[]
+    documents: List[Any] = []
+    found = 0
+    failed = 0
 
-    # pdf files
-    pdf_files = list(data_path.glob('**/*.pdf'))
-    print(f"[DEBUG] Found {len(pdf_files)} PDF files: {[str(f) for f in pdf_files]}")
+    for label, pattern, loader in _LOADERS:
+        files = list(data_path.glob(f"**/{pattern}"))
+        print(f"[DEBUG] Found {len(files)} {label} files: {[str(f) for f in files]}")
+        for file_path in files:
+            found += 1
+            print(f"[DEBUG] Loading {label} {file_path}")
+            try:
+                loaded = loader(file_path)
+                print(f"[DEBUG] loaded {len(loaded)} {label} docs from {file_path}")
+                documents.extend(loaded)
+            except Exception as e:
+                failed += 1
+                print(f"[ERROR] Failed to load {label} {file_path}: {e}")
 
-    for pdf_file in pdf_files:
-        print(f"[DEBUG] Loaded PDF {pdf_file}")
-        try:
-            loader = PyPDFLoader(str(pdf_file))
-            loaded = loader.load()
-            print(f"[DEBUG] loaded {len(loaded)} PDF docs from {pdf_file}")
-            documents.extend(loaded)
-
-        except Exception as e :
-            print(f"[ERROR] Failed to load PDF {pdf_file}: {e}")
-    
-    ## for text file 
-    text_files = list(data_path.glob('**/*.txt'))
-    print(f"[DEBUG] Founded {len(text_files)} Text files: {[str(t) for t in text_files]} ")
-
-    for text_file in text_files:
-        print(f"[DEBUG] Loaded text in {text_file}")
-        try:
-            loader = TextLoader(str(text_file), encoding="utf-8")
-            loaded = loader.load()
-            print(f"[debug] loaded {len(loaded)} texts docs from {text_file}")
-            documents.extend(loaded)
-        except Exception as e:
-            print(f"Failed to load TEXT {text_file}: {e} ")
-    
-    # for CSV file
-    csv_files = list(data_path.glob('**/*.csv'))
-    print(f"Founded {len(csv_files)} CSV files: {(str(c) for c in csv_files)}")
-
-    for csv_file in csv_files:
-        print(f"[DEBUG] loaded csv file: {csv_file}")
-        try:
-            loader = CSVLoader(csv_file)
-            loaded = loader.load()
-            print(f"[DEBUG] loaded {len(loaded)} CSV docs from {csv_file}")
-            documents.extend(loaded)
-
-        except Exception as e:
-            print(f" failed loaded {csv_file}: {e}")
-    
-    
+    print(
+        f"[INFO] Loaded {len(documents)} documents from {found} files "
+        f"({failed} failed)"
+    )
+    if not documents:
+        raise ValueError(
+            f"No documents loaded from {data_path}. "
+            f"Found {found} files, {failed} failed to read. "
+            "Add PDF, TXT, CSV, or PPTX files under data/."
+        )
     return documents
-
-
-
-
-    
-
-
-
-
-    
-

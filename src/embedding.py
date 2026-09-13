@@ -7,7 +7,7 @@ from langsmith import traceable
 
 
 class EmbeddingPipeline:
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, chunk_overlap: int = 200):
+    def __init__(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 500, chunk_overlap: int = 50):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.model = SentenceTransformer(model_name)
@@ -31,6 +31,8 @@ class EmbeddingPipeline:
     def emb_chunks(self, chunks: List[Any]) -> np.ndarray:
         texts = [chunk.page_content for chunk in chunks]
         print(f"[INFO] Generating embedding for {len(texts)}")
+        if not texts:
+            raise ValueError("Cannot embed an empty chunk list.")
         embeddings = self.model.encode(texts, show_progress_bar=True)
         print(f"[INFO] Embedding shape: {embeddings.shape}")
 
